@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          String @id
+  username    String
+  association String
+  seat        Seat?
+}
+
+model Seat {
+  id          Int     @id @default(autoincrement())
+  association String
+  ownerId     String? @unique
+  owner       User?   @relation(fields: [ownerId], references: [id])
+}
