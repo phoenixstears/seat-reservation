@@ -16,31 +16,25 @@ interface Seat {
 }
 
 const getAssociationColor = (association: string): string => {
-
-  if (association == "DSEA"){
-     return "bg-[#00a6d6] border-[#000000]";
-  }
-  else if (association === "Link") {
+  if (association == "DSEA") {
+    return "bg-[#00a6d6] border-[#000000]";
+  } else if (association === "Link") {
     return "bg-[#FFFFFF] border-[#000000]";
-  }
-  else if (association === "Blueshell") {
+  } else if (association === "Blueshell") {
     return "bg-[#3286f7] border-[#000000]";
-  }
-  else if (association === "Zephyr"){
-     return "bg-[#cf363c] border-[#000000]";
-  }
-  else if (association === "Dorans") {
+  } else if (association === "Zephyr") {
+    return "bg-[#cf363c] border-[#000000]";
+  } else if (association === "Dorans") {
     return "bg-[#f7be15] border-[#000000]";
-  }
-  else if (association === "Paragon") {
-     return "bg-[#000000] border-[#000000]";
+  } else if (association === "Paragon") {
+    return "bg-[#000000] border-[#000000]";
   } else {
     return "bg-gray-400 border-gray-500";
   }
 };
 
 const getAssociationHoverColor = (association: string): string => {
-  return "hover:bg-gray-200"; 
+  return "hover:bg-gray-200";
 };
 
 const offSeats = new Set<number>();
@@ -59,61 +53,79 @@ export default function SeatGrid() {
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>({ isOpen: false, seat: null });
 
+  const fetchSeats = async () => {
+    try {
+      const response = await fetch("/api/seats");
+      if (!response.ok) throw new Error("Failed to fetch seats");
+
+      const data = await response.json();
+      setSeats(data.sort((a: Seat, b: Seat) => a.id - b.id));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleConfirm = async () => {
     if (!username.trim()) return;
-    
-    const res = await fetch('api/users', {method: "POST", body: JSON.stringify({ username }) });
-    const data= await res.json();
-    const association = data.association
+
+    const res = await fetch("api/users", {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    });
+
+    const data = await res.json();
+    const association = data.association;
+
+    offSeats.clear();
+
     function addRange(set: Set<number>, start: number, end: number) {
-  for (let i = start; i <= end; i++) {
-    set.add(i);
-  }
-}
+      for (let i = start; i <= end; i++) {
+        set.add(i);
+      }
+    }
+
     switch (association) {
-  case "DSEA":
-    addRange(offSeats, 26, 240);
-    break;
-  case "Link":
-    addRange(offSeats, 51, 240);
-    break;
-  case "Zephyr":
-    addRange(offSeats, 76, 240);
-    break;
-  case "Blueshell":
-    addRange(offSeats, 101, 240);
-    break;
-  case "Dorans":
-    addRange(offSeats, 126, 240);
-    break;
-  case "Paragon":
-    addRange(offSeats, 151, 240);
-    break;
-  case "Free":
-    addRange(offSeats, 1, 150);
-    break;
-}
+      case "DSEA":
+        addRange(offSeats, 26, 240);
+        break;
+      case "Link":
+        addRange(offSeats, 51, 240);
+        break;
+      case "Zephyr":
+        addRange(offSeats, 76, 240);
+        break;
+      case "Blueshell":
+        addRange(offSeats, 101, 240);
+        break;
+      case "Dorans":
+        addRange(offSeats, 126, 240);
+        break;
+      case "Paragon":
+        addRange(offSeats, 151, 240);
+        break;
+      case "Free":
+        addRange(offSeats, 1, 150);
+        break;
+    }
+
     console.log(`Logged in as: ${username}`);
-    
+    setLoading(true);
     setIsLoggedIn(true);
   };
 
   useEffect(() => {
-    if (isLoggedIn) {
-      const fetchSeats = async () => {
-        try {
-          const response = await fetch("/api/seats");
-          if (!response.ok) throw new Error("Failed to fetch seats");
-          const data = await response.json();
-          setSeats(data.sort((a: Seat, b: Seat) => a.id - b.id));
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Unknown error");
-        } finally {
-          setLoading(false);
-        }
-      };
+    if (!isLoggedIn) return;
+
+    fetchSeats();
+
+    const interval = setInterval(() => {
       fetchSeats();
-    }
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, [isLoggedIn]);
 
   const handleSeatClick = (seat: Seat) => {
@@ -124,10 +136,19 @@ export default function SeatGrid() {
   const handleReserve = async () => {
     if (!modal.seat) return;
 
-    const seatId = modal.seat.id 
-    const res = await fetch ("api/seats",{method: "PUT", body: JSON.stringify({ seatId, username})})
-    console.log(res)
+    const seatId = modal.seat.id;
+    const res = await fetch("api/seats", {
+      method: "PUT",
+      body: JSON.stringify({ seatId, username }),
+    });
+
+    console.log(res);
     console.log(`User ${username} is reserving seat ${modal.seat.id}`);
+
+    if (res.ok) {
+      await fetchSeats();
+    }
+
     setModal({ isOpen: false, seat: null });
   };
 
@@ -227,7 +248,6 @@ export default function SeatGrid() {
         </div>
       </div>
 
-      {/* Modal */}
       {modal.isOpen && modal.seat && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
